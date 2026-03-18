@@ -32,13 +32,6 @@ export default function ProductDetailPage() {
     );
   }
 
-  const variant = useMemo(() => {
-    if (!selectedSize || !selectedColor) return null;
-    return product.variants.find(v => v.size === selectedSize && v.color === selectedColor);
-  }, [selectedSize, selectedColor, product]);
-
-  const availableStock = variant?.stock ?? 0;
-
   const handleAdd = () => {
     if (!selectedSize || !selectedColor) {
       toast.error('Veuillez sélectionner une taille et une couleur');
