@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        heading: ['"Playfair Display"', 'serif'],
+        body: ['"DM Sans"', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +61,16 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        noor: {
+          ivory: "hsl(var(--noor-ivory))",
+          aubergine: "hsl(var(--noor-aubergine))",
+          gold: "hsl(var(--noor-gold))",
+          sage: "hsl(var(--noor-sage))",
+          whatsapp: "hsl(var(--noor-whatsapp))",
+          wave: "hsl(var(--noor-wave))",
+          om: "hsl(var(--noor-om))",
+          "admin-bg": "hsl(var(--noor-admin-bg))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,25 +79,27 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "pulse-gold": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsla(43, 52%, 54%, 0.5)" },
+          "50%": { boxShadow: "0 0 0 8px hsla(43, 52%, 54%, 0)" },
+        },
+        "scroll-indicator": {
+          "0%, 100%": { transform: "translateY(0)", opacity: "1" },
+          "50%": { transform: "translateY(8px)", opacity: "0.5" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-gold": "pulse-gold 2s ease-in-out infinite",
+        "scroll-indicator": "scroll-indicator 1.5s ease-in-out infinite",
       },
     },
   },
