@@ -11,11 +11,17 @@ export default function ProductDetailPage() {
   const { getProduct } = useProducts();
   const { addItem } = useCart();
   const product = getProduct(id || '');
-
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [mainImage, setMainImage] = useState(0);
+
+  const variant = useMemo(() => {
+    if (!selectedSize || !selectedColor || !product) return null;
+    return product.variants.find(v => v.size === selectedSize && v.color === selectedColor);
+  }, [selectedSize, selectedColor, product]);
+
+  const availableStock = variant?.stock ?? 0;
 
   if (!product) {
     return (
