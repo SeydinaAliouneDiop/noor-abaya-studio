@@ -5,26 +5,43 @@ import { AlertTriangle, X } from 'lucide-react';
 export default function AdminStock() {
   const { products, updateVariantStock } = useProducts();
   const [dismissed, setDismissed] = useState(false);
+  const [updating, setUpdating] = useState<string | null>(null);
 
   const allVariants = products.flatMap(p =>
     p.variants.map(v => ({ product: p, ...v }))
   );
 
   const outOfStock = allVariants.filter(v => v.stock === 0);
-  const lowStock = allVariants.filter(v => v.stock > 0 && v.stock <= v.alertThreshold);
+
+  const handleStockChange = async (productId: string, size: string, color: string, stock: number) => {
+    const key = `${productId}-${size}-${color}`;
+    setUpdating(key);
+    await updateVariantStock(productId, size, color, stock);
+    setUpdating(null);
+  };
+
+  const handleRestock = async (productId: string, size: string, color: string, currentStock: number) => {
+    const key = `${productId}-${size}-${color}`;
+    setUpdating(key);
+    await updateVariantStock(productId, size, color, currentStock + 10);
+    setUpdating(null);
+  };
 
   return (
     <div>
       <h1 className="font-heading text-2xl font-bold mb-6">Gestion du stock</h1>
 
-      {/* Alert banner */}
       {!dismissed && outOfStock.length > 0 && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <p className="text-sm font-medium">⚠️ {outOfStock.length} variante{outOfStock.length > 1 ? 's' : ''} en rupture de stock</p>
+            <p className="text-sm font-medium">
+              ⚠️ {outOfStock.length} variante{outOfStock.length > 1 ? 's' : ''} en rupture de stock
+            </p>
           </div>
-          <button onClick={() => setDismissed(true)} className="p-1 hover:bg-destructive/10 rounded transition-noor"><X className="h-4 w-4" /></button>
+          <button onClick={() => setDismissed(true)} className="p-1 hover:bg-destructive/10 rounded transition-noor">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
@@ -42,10 +59,16 @@ export default function AdminStock() {
             </thead>
             <tbody>
               {allVariants.map((v, i) => {
-                const isLow = v.stock <= v.alertThreshold;
+                const isLow = v.stock > 0 && v.stock <= v.alertThreshold;
                 const isOut = v.stock === 0;
+                const key = `${v.product.id}-${v.size}-${v.color}`;
+                const isUpdating = updating === key;
+
                 return (
-                  <tr key={`${v.product.id}-${v.size}-${v.color}-${i}`} className={`border-b border-border/50 transition-noor ${isOut ? 'bg-destructive/5' : isLow ? 'bg-orange-50' : ''}`}>
+                  <tr
+                    key={`${key}-${i}`}
+                    className={`border-b border-border/50 transition-noor ${isOut ? 'bg-destructive/5' : isLow ? 'bg-orange-50' : ''}`}
+                  >
                     <td className="p-3 font-medium">{v.product.name}</td>
                     <td className="p-3">{v.size} — {v.color}</td>
                     <td className="p-3">
@@ -53,17 +76,23 @@ export default function AdminStock() {
                         type="number"
                         min={0}
                         value={v.stock}
-                        onChange={e => updateVariantStock(v.product.id, v.size, v.color, Number(e.target.value))}
-                        className={`w-16 border rounded px-2 py-1 text-center text-sm focus:ring-2 focus:ring-accent outline-none ${isOut ? 'border-destructive bg-destructive/5' : 'border-border bg-card'}`}
+                        disabled={isUpdating}
+                        onChange={e => handleStockChange(v.product.id, v.size, v.color, Number(e.target.value))}
+                        className={`w-16 border rounded px-2 py-1 text-center text-sm focus:ring-2 focus:ring-accent outline-none transition-noor ${
+                          isOut ? 'border-destructive bg-destructive/5' : 'border-border bg-card'
+                        } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
                       />
                     </td>
                     <td className="p-3 text-muted-foreground">{v.alertThreshold}</td>
                     <td className="p-3">
                       <button
-                        onClick={() => updateVariantStock(v.product.id, v.size, v.color, v.stock + 10)}
-                        className="px-3 py-1.5 border border-border rounded-lg text-xs font-medium hover:bg-muted transition-noor"
+                        onClick={() => handleRestock(v.product.id, v.size, v.color, v.stock)}
+                        disabled={isUpdating}
+                        className="px-3 py-1.5 border border-border rounded-lg text-xs font-medium hover:bg-muted transition-noor disabled:opacity-50 flex items-center gap-1.5"
                       >
-                        Réapprovisionner (+10)
+                        {isUpdating ? (
+                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : '+'} Réapprovisionner (+10)
                       </button>
                     </td>
                   </tr>
@@ -72,6 +101,9 @@ export default function AdminStock() {
             </tbody>
           </table>
         </div>
+        {allVariants.length === 0 && (
+          <div className="p-8 text-center text-muted-foreground">Aucun produit dans le stock</div>
+        )}
       </div>
     </div>
   );

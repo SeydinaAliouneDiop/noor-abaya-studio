@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useProducts } from '@/contexts/ProductsContext';
 import { formatCFA, isNewProduct } from '@/lib/utils';
-import { CATEGORIES, FABRICS, SIZES, Product, ProductColor } from '@/lib/types';
+import { CATEGORIES, FABRICS, SIZES, Product } from '@/lib/types';
 import ImageUpload from '@/components/admin/ImageUpload';
 import { Plus, Edit, Trash2, X } from 'lucide-react';
 
@@ -9,6 +9,8 @@ export default function AdminProducts() {
   const { products, addProduct, updateProduct, deleteProduct } = useProducts();
   const [editing, setEditing] = useState<Product | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const emptyProduct: Omit<Product, 'id' | 'createdAt'> = {
     name: '', description: '', price: 0, category: 'Abaya classique', fabric: 'Nida',
@@ -21,7 +23,7 @@ export default function AdminProducts() {
 
   const openCreate = () => { setForm(emptyProduct); setEditing(null); setIsCreating(true); };
   const openEdit = (p: Product) => { setForm(p); setEditing(p); setIsCreating(true); };
-  const close = () => { setIsCreating(false); setEditing(null); };
+  const close = () => { setIsCreating(false); setEditing(null); setSaving(false); };
 
   const addColor = () => {
     if (!newColorName) return;
@@ -50,13 +52,23 @@ export default function AdminProducts() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!form.name || form.price === 0) return;
+    setSaving(true);
     if (editing) {
-      updateProduct(editing.id, form);
+      await updateProduct(editing.id, form);
     } else {
-      addProduct({ ...form, id: 'p' + Date.now(), createdAt: new Date().toISOString() } as Product);
+      await addProduct(form);
     }
+    setSaving(false);
     close();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Supprimer ce produit ?')) return;
+    setDeletingId(id);
+    await deleteProduct(id);
+    setDeletingId(null);
   };
 
   if (isCreating) {
@@ -66,7 +78,7 @@ export default function AdminProducts() {
           <h1 className="font-heading text-2xl font-bold">{editing ? 'Modifier le produit' : 'Ajouter un produit'}</h1>
           <button onClick={close} className="p-2 hover:bg-muted rounded-lg transition-noor"><X className="h-5 w-5" /></button>
         </div>
-        <div className="max-w-2xl space-y-5">
+        <div className="max-w-2xl space-y-5 pb-10">
           <div>
             <label className="text-sm font-medium mb-1 block">Nom du produit</label>
             <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-accent outline-none" />
@@ -94,7 +106,6 @@ export default function AdminProducts() {
             </select>
           </div>
 
-          {/* Sizes */}
           <div>
             <label className="text-sm font-medium mb-2 block">Tailles disponibles</label>
             <div className="flex flex-wrap gap-2">
@@ -106,7 +117,6 @@ export default function AdminProducts() {
             </div>
           </div>
 
-          {/* Colors */}
           <div>
             <label className="text-sm font-medium mb-2 block">Couleurs</label>
             <div className="flex flex-wrap gap-2 mb-3">
@@ -125,7 +135,6 @@ export default function AdminProducts() {
             </div>
           </div>
 
-          {/* Stock Matrix */}
           {form.sizes.length > 0 && form.colors.length > 0 && (
             <div>
               <label className="text-sm font-medium mb-2 block">Stock par variante</label>
@@ -154,13 +163,11 @@ export default function AdminProducts() {
             </div>
           )}
 
-          {/* Images */}
           <div>
             <label className="text-sm font-medium mb-2 block">Images</label>
             <ImageUpload value={form.images} onChange={images => setForm({ ...form, images })} />
           </div>
 
-          {/* Toggles */}
           <div className="flex gap-6">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.isNew} onChange={e => setForm({ ...form, isNew: e.target.checked })} className="rounded" />
@@ -172,8 +179,16 @@ export default function AdminProducts() {
             </label>
           </div>
 
-          <button onClick={handleSave} className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold text-sm hover:bg-accent hover:text-accent-foreground transition-noor min-h-[48px]">
-            {editing ? 'Enregistrer les modifications' : 'Ajouter le produit'}
+          <button
+            onClick={handleSave}
+            disabled={saving || !form.name || form.price === 0}
+            className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold text-sm hover:bg-accent hover:text-accent-foreground transition-noor min-h-[48px] disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving ? (
+              <><span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> Enregistrement...</>
+            ) : (
+              editing ? 'Enregistrer les modifications' : 'Ajouter le produit'
+            )}
           </button>
         </div>
       </div>
@@ -192,7 +207,11 @@ export default function AdminProducts() {
         {products.map(p => (
           <div key={p.id} className="bg-card rounded-xl overflow-hidden shadow-warm">
             <div className="aspect-[4/5] bg-muted">
-              <img src={p.images[0] || 'https://placehold.co/400x500/F5F0E8/3D1A47?text=No+Image'} alt={p.name} className="w-full h-full object-cover" />
+              <img
+                src={p.images[0] || 'https://placehold.co/400x500/F5F0E8/3D1A47?text=No+Image'}
+                alt={p.name}
+                className="w-full h-full object-cover"
+              />
             </div>
             <div className="p-3">
               <h3 className="font-heading font-semibold text-sm truncate">{p.name}</h3>
@@ -202,8 +221,19 @@ export default function AdminProducts() {
                   {p.isActive ? 'Actif' : 'Inactif'}
                 </span>
                 <div className="flex gap-1">
-                  <button onClick={() => openEdit(p)} className="p-1.5 hover:bg-muted rounded transition-noor"><Edit className="h-3.5 w-3.5" /></button>
-                  <button onClick={() => deleteProduct(p.id)} className="p-1.5 hover:bg-destructive/10 text-destructive rounded transition-noor"><Trash2 className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => openEdit(p)} className="p-1.5 hover:bg-muted rounded transition-noor">
+                    <Edit className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p.id)}
+                    disabled={deletingId === p.id}
+                    className="p-1.5 hover:bg-destructive/10 text-destructive rounded transition-noor disabled:opacity-50"
+                  >
+                    {deletingId === p.id
+                      ? <span className="w-3.5 h-3.5 border-2 border-destructive border-t-transparent rounded-full animate-spin block" />
+                      : <Trash2 className="h-3.5 w-3.5" />
+                    }
+                  </button>
                 </div>
               </div>
             </div>

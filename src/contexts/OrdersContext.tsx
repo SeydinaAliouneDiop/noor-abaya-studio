@@ -1,109 +1,192 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Order, OrderStatus } from '@/lib/types';
+import { supabase } from '@/lib/supabase/client';
 
 interface OrdersContextType {
   orders: Order[];
-  addOrder: (order: Order) => void;
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  loading: boolean;
+  addOrder: (order: Omit<Order, 'id'>) => Promise<string>;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   getOrder: (id: string) => Order | undefined;
-  getOrderByRef: (ref: string) => Order | undefined;
+  getOrderByRef: (ref: string) => Promise<Order | undefined>;
+  refetch: () => Promise<void>;
 }
 
 const OrdersContext = createContext<OrdersContextType | undefined>(undefined);
 
-function loadOrders(): Order[] {
-  try {
-    const data = localStorage.getItem('noor-orders');
-    return data ? JSON.parse(data) : MOCK_ORDERS;
-  } catch { return MOCK_ORDERS; }
+async function fetchOrders(): Promise<Order[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`*, order_items(*), order_status_history(*)`)
+    .order('created_at', { ascending: false });
+
+  if (error) { console.error('fetchOrders error:', error); return []; }
+
+  return (data || []).map((o: any) => ({
+    id: o.id,
+    ref: o.ref,
+    customerFirstName: o.customer_first_name,
+    customerLastName: o.customer_last_name,
+    phone: o.phone,
+    address: o.address,
+    quartier: o.quartier,
+    paymentMethod: o.payment_method,
+    subtotal: o.subtotal,
+    deliveryFee: o.delivery_fee,
+    total: o.total,
+    status: o.status,
+    createdAt: o.created_at,
+    items: (o.order_items || []).map((i: any) => ({
+      productId: i.product_id,
+      name: i.name,
+      image: i.image,
+      size: i.size,
+      color: i.color,
+      quantity: i.quantity,
+      price: i.price,
+    })),
+    statusHistory: (o.order_status_history || [])
+      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .map((h: any) => ({
+        status: h.status,
+        date: h.created_at,
+      })),
+  }));
 }
 
-const MOCK_ORDERS: Order[] = [
-  {
-    id: 'o1', ref: 'CMD-2024-0038',
-    customerFirstName: 'Aminata', customerLastName: 'Diallo',
-    phone: '+221 77 123 45 67', address: 'Pikine, rue 10, villa 4', quartier: 'Pikine',
-    paymentMethod: 'wave',
-    items: [{ productId: 'p1', name: 'Abaya Fatou', image: 'https://placehold.co/400x500/F5F0E8/3D1A47?text=Abaya+Fatou', size: 'M', color: 'Noir', quantity: 1, price: 18000 }],
-    subtotal: 18000, deliveryFee: 2000, total: 20000,
-    status: 'confirmee',
-    statusHistory: [
-      { status: 'en_attente', date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
-      { status: 'confirmee', date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
-    ],
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'o2', ref: 'CMD-2024-0039',
-    customerFirstName: 'Fatou', customerLastName: 'Sow',
-    phone: '+221 78 234 56 78', address: 'Grand Yoff, villa 12', quartier: 'Grand Yoff',
-    paymentMethod: 'orange_money',
-    items: [
-      { productId: 'p2', name: 'Abaya Aïssatou Royale', image: 'https://placehold.co/400x500/F5F0E8/3D1A47?text=Aissatou+Royale', size: 'L', color: 'Bordeaux', quantity: 1, price: 42000 },
-      { productId: 'p4', name: 'Khimar Awa', image: 'https://placehold.co/400x500/F5F0E8/3D1A47?text=Khimar+Awa', size: 'M', color: 'Noir', quantity: 1, price: 12000 },
-    ],
-    subtotal: 54000, deliveryFee: 2000, total: 56000,
-    status: 'en_attente',
-    statusHistory: [
-      { status: 'en_attente', date: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() },
-    ],
-    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'o3', ref: 'CMD-2024-0040',
-    customerFirstName: 'Marième', customerLastName: 'Ndiaye',
-    phone: '+221 76 345 67 89', address: 'Médina, rue 22', quartier: 'Médina',
-    paymentMethod: 'wave',
-    items: [{ productId: 'p7', name: 'Abaya Sokhna Prestige', image: 'https://placehold.co/400x500/F5F0E8/3D1A47?text=Sokhna+Prestige', size: 'M', color: 'Ivoire', quantity: 1, price: 45000 }],
-    subtotal: 45000, deliveryFee: 2000, total: 47000,
-    status: 'expediee',
-    statusHistory: [
-      { status: 'en_attente', date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() },
-      { status: 'confirmee', date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString() },
-      { status: 'expediee', date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
-    ],
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'o4', ref: 'CMD-2024-0041',
-    customerFirstName: 'Awa', customerLastName: 'Ba',
-    phone: '+221 70 456 78 90', address: 'Parcelles Assainies U14', quartier: 'Parcelles Assainies',
-    paymentMethod: 'orange_money',
-    items: [{ productId: 'p3', name: 'Abaya Mariama Sport', image: 'https://placehold.co/400x500/F5F0E8/3D1A47?text=Mariama+Sport', size: 'L', color: 'Kaki', quantity: 2, price: 15000 }],
-    subtotal: 30000, deliveryFee: 2000, total: 32000,
-    status: 'en_attente',
-    statusHistory: [
-      { status: 'en_attente', date: new Date().toISOString() },
-    ],
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export function OrdersProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState<Order[]>(loadOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    localStorage.setItem('noor-orders', JSON.stringify(orders));
-  }, [orders]);
+  const load = async () => {
+    setLoading(true);
+    const data = await fetchOrders();
+    setOrders(data);
+    setLoading(false);
+  };
 
-  const addOrder = (order: Order) => setOrders(prev => [order, ...prev]);
+  useEffect(() => { load(); }, []);
 
-  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id !== orderId) return o;
-      return {
-        ...o,
-        status,
-        statusHistory: [...o.statusHistory, { status, date: new Date().toISOString() }],
-      };
-    }));
+  const addOrder = async (order: Omit<Order, 'id'>): Promise<string> => {
+    const { data: orderData, error } = await supabase
+      .from('orders')
+      .insert([{
+        ref: order.ref,
+        customer_first_name: order.customerFirstName,
+        customer_last_name: order.customerLastName,
+        phone: order.phone,
+        address: order.address,
+        quartier: order.quartier,
+        payment_method: order.paymentMethod,
+        subtotal: order.subtotal,
+        delivery_fee: order.deliveryFee,
+        total: order.total,
+        status: 'en_attente',
+      }])
+      .select()
+      .single();
+
+    if (error || !orderData) {
+      console.error('addOrder error:', error);
+      return '';
+    }
+
+    if (order.items.length > 0) {
+      await supabase.from('order_items').insert(
+        order.items.map(item => ({
+          order_id: orderData.id,
+          product_id: item.productId,
+          name: item.name,
+          image: item.image,
+          size: item.size,
+          color: item.color,
+          quantity: item.quantity,
+          price: item.price,
+        }))
+      );
+    }
+
+    await supabase.from('order_status_history').insert([{
+      order_id: orderData.id,
+      status: 'en_attente',
+    }]);
+
+    await load();
+    return orderData.id;
+  };
+
+  const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
+    // Mise à jour immédiate de l'affichage — pas besoin d'attendre Supabase
+    setOrders(prev => prev.map(o =>
+      o.id === orderId
+        ? {
+            ...o,
+            status,
+            statusHistory: [
+              ...o.statusHistory,
+              { status, date: new Date().toISOString() },
+            ],
+          }
+        : o
+    ));
+
+    // Sauvegarde en base en parallèle
+    await supabase
+      .from('orders')
+      .update({ status })
+      .eq('id', orderId);
+
+    await supabase.from('order_status_history').insert([{
+      order_id: orderId,
+      status,
+    }]);
   };
 
   const getOrder = (id: string) => orders.find(o => o.id === id);
-  const getOrderByRef = (ref: string) => orders.find(o => o.ref.toLowerCase() === ref.toLowerCase());
+
+  const getOrderByRef = async (ref: string): Promise<Order | undefined> => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`*, order_items(*), order_status_history(*)`)
+      .ilike('ref', ref)
+      .single();
+
+    if (error || !data) return undefined;
+
+    return {
+      id: data.id,
+      ref: data.ref,
+      customerFirstName: data.customer_first_name,
+      customerLastName: data.customer_last_name,
+      phone: data.phone,
+      address: data.address,
+      quartier: data.quartier,
+      paymentMethod: data.payment_method,
+      subtotal: data.subtotal,
+      deliveryFee: data.delivery_fee,
+      total: data.total,
+      status: data.status,
+      createdAt: data.created_at,
+      items: (data.order_items || []).map((i: any) => ({
+        productId: i.product_id,
+        name: i.name,
+        image: i.image,
+        size: i.size,
+        color: i.color,
+        quantity: i.quantity,
+        price: i.price,
+      })),
+      statusHistory: (data.order_status_history || [])
+        .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .map((h: any) => ({ status: h.status, date: h.created_at })),
+    };
+  };
 
   return (
-    <OrdersContext.Provider value={{ orders, addOrder, updateOrderStatus, getOrder, getOrderByRef }}>
+    <OrdersContext.Provider value={{
+      orders, loading, addOrder, updateOrderStatus,
+      getOrder, getOrderByRef, refetch: load,
+    }}>
       {children}
     </OrdersContext.Provider>
   );

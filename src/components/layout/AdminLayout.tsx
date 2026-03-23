@@ -1,6 +1,7 @@
 import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { LayoutDashboard, ShoppingBag, Package, Warehouse, BarChart3, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const NAV_ITEMS = [
   { to: '/admin', icon: LayoutDashboard, label: 'Tableau de bord', end: true },
@@ -12,13 +13,29 @@ const NAV_ITEMS = [
 
 export default function AdminLayout() {
   const location = useLocation();
+  const { user, loading, signOut } = useAuth();
+
+  // Pendant le chargement de la session
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Rediriger vers login si pas connectée
+  if (!user) {
+    return <Navigate to="/admin/login" replace />;
+  }
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'hsl(var(--noor-admin-bg))' }}>
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-56 flex-col border-r border-border bg-card z-40">
         <div className="p-5 border-b border-border">
-          <h1 className="font-heading text-xl font-bold">Noor Admin</h1>
+          <h1 className="font-heading text-lg font-bold">✦ Modest Pearl</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Espace admin</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {NAV_ITEMS.map(item => (
@@ -36,7 +53,11 @@ export default function AdminLayout() {
           ))}
         </nav>
         <div className="p-3 border-t border-border">
-          <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted transition-noor w-full">
+          <p className="text-xs text-muted-foreground px-3 mb-2 truncate">{user.email}</p>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-noor w-full"
+          >
             <LogOut className="h-4 w-4" />
             Se déconnecter
           </button>

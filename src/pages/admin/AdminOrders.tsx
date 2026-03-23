@@ -12,6 +12,7 @@ export default function AdminOrders() {
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [openAction, setOpenAction] = useState<string | null>(null);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: 'all', label: 'Toutes' },
@@ -24,12 +25,19 @@ export default function AdminOrders() {
   const filtered = activeTab === 'all' ? orders : orders.filter(o => o.status === activeTab);
   const selectedOrder = selectedOrderId ? orders.find(o => o.id === selectedOrderId) : null;
 
-  const handleAction = (orderId: string, action: 'confirm_payment' | 'mark_shipped' | 'cancel') => {
+  const handleAction = async (orderId: string, action: 'confirm_payment' | 'mark_shipped' | 'cancel') => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
-    const statusMap: Record<string, OrderStatus> = { confirm_payment: 'confirmee', mark_shipped: 'expediee', cancel: 'annulee' };
-    updateOrderStatus(orderId, statusMap[action]);
+    const statusMap: Record<string, OrderStatus> = {
+      confirm_payment: 'confirmee',
+      mark_shipped: 'expediee',
+      cancel: 'annulee',
+    };
+    setLoadingAction(orderId);
+    await updateOrderStatus(orderId, statusMap[action]);
+    setLoadingAction(null);
     setOpenAction(null);
+    setSelectedOrderId(null);
   };
 
   return (
@@ -81,14 +89,24 @@ export default function AdminOrders() {
                   </td>
                   <td className="p-3" onClick={e => e.stopPropagation()}>
                     <div className="relative">
-                      <button onClick={() => setOpenAction(openAction === o.id ? null : o.id)} className="px-3 py-1.5 border border-border rounded-lg text-xs font-medium hover:bg-muted transition-noor flex items-center gap-1">
-                        Actions <ChevronDown className="h-3 w-3" />
+                      <button
+                        onClick={() => setOpenAction(openAction === o.id ? null : o.id)}
+                        className="px-3 py-1.5 border border-border rounded-lg text-xs font-medium hover:bg-muted transition-noor flex items-center gap-1"
+                        disabled={loadingAction === o.id}
+                      >
+                        {loadingAction === o.id ? (
+                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>Actions <ChevronDown className="h-3 w-3" /></>
+                        )}
                       </button>
                       {openAction === o.id && (
                         <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-warm-lg z-20 min-w-[200px]">
                           {o.status === 'en_attente' && (
                             <>
-                              <button onClick={() => handleAction(o.id, 'confirm_payment')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-noor">Confirmer paiement</button>
+                              <button onClick={() => handleAction(o.id, 'confirm_payment')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-noor">
+                                ✓ Confirmer paiement
+                              </button>
                               <a href={getWhatsAppLink('confirm_payment', { ref: o.ref, customerFirstName: o.customerFirstName, customerPhone: o.phone })} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted transition-noor text-noor-whatsapp">
                                 <MessageCircle className="h-3 w-3" /> WhatsApp confirmation
                               </a>
@@ -96,7 +114,9 @@ export default function AdminOrders() {
                           )}
                           {o.status === 'confirmee' && (
                             <>
-                              <button onClick={() => handleAction(o.id, 'mark_shipped')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-noor">Marquer expédiée</button>
+                              <button onClick={() => handleAction(o.id, 'mark_shipped')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-noor">
+                                🚚 Marquer expédiée
+                              </button>
                               <a href={getWhatsAppLink('mark_shipped', { ref: o.ref, customerFirstName: o.customerFirstName, customerPhone: o.phone })} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted transition-noor text-noor-whatsapp">
                                 <MessageCircle className="h-3 w-3" /> WhatsApp expédition
                               </a>
@@ -104,7 +124,10 @@ export default function AdminOrders() {
                           )}
                           {o.status !== 'annulee' && o.status !== 'expediee' && (
                             <>
-                              <button onClick={() => handleAction(o.id, 'cancel')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted text-destructive transition-noor">Annuler</button>
+                              <div className="border-t border-border my-1" />
+                              <button onClick={() => handleAction(o.id, 'cancel')} className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted text-destructive transition-noor">
+                                ✕ Annuler la commande
+                              </button>
                               <a href={getWhatsAppLink('cancel', { ref: o.ref, customerFirstName: o.customerFirstName, customerPhone: o.phone })} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted transition-noor text-destructive">
                                 <MessageCircle className="h-3 w-3" /> WhatsApp annulation
                               </a>
@@ -130,7 +153,9 @@ export default function AdminOrders() {
             <div className="p-5">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="font-heading text-xl font-bold">{selectedOrder.ref}</h2>
-                <button onClick={() => setSelectedOrderId(null)} className="p-2 hover:bg-muted rounded-lg transition-noor"><X className="h-5 w-5" /></button>
+                <button onClick={() => setSelectedOrderId(null)} className="p-2 hover:bg-muted rounded-lg transition-noor">
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
               <div className="space-y-5">
@@ -161,7 +186,8 @@ export default function AdminOrders() {
                     </div>
                   ))}
                   <div className="border-t border-border pt-2 flex justify-between font-bold text-sm">
-                    <span>Total</span><span className="text-accent">{formatCFA(selectedOrder.total)}</span>
+                    <span>Total</span>
+                    <span className="text-accent">{formatCFA(selectedOrder.total)}</span>
                   </div>
                 </div>
 
@@ -169,7 +195,7 @@ export default function AdminOrders() {
                   <h4 className="text-sm font-semibold text-muted-foreground mb-2">Historique</h4>
                   {selectedOrder.statusHistory.map((h, i) => (
                     <div key={i} className="flex items-center gap-3 mb-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-primary flex-shrink-0" />
                       <div>
                         <p className="text-sm font-medium">{STATUS_LABELS[h.status]}</p>
                         <p className="text-xs text-muted-foreground">{new Date(h.date).toLocaleString('fr-FR')}</p>
@@ -178,11 +204,10 @@ export default function AdminOrders() {
                   ))}
                 </div>
 
-                {/* WhatsApp quick action */}
                 {selectedOrder.status !== 'annulee' && (
                   <a
                     href={getWhatsAppLink(
-                      selectedOrder.status === 'en_attente' ? 'confirm_payment' : selectedOrder.status === 'confirmee' ? 'mark_shipped' : 'confirm_payment',
+                      selectedOrder.status === 'en_attente' ? 'confirm_payment' : 'mark_shipped',
                       { ref: selectedOrder.ref, customerFirstName: selectedOrder.customerFirstName, customerPhone: selectedOrder.phone }
                     )}
                     target="_blank"

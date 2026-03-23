@@ -1,15 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useOrders } from '@/contexts/OrdersContext';
 import { useProducts } from '@/contexts/ProductsContext';
 import { formatCFA } from '@/lib/utils';
 import { STATUS_LABELS, STATUS_COLORS } from '@/lib/types';
-import { TrendingUp, Clock, AlertTriangle, Package } from 'lucide-react';
+import { TrendingUp, Clock, AlertTriangle, Bell, BellOff } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Link } from 'react-router-dom';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 export default function AdminDashboard() {
   const { orders } = useOrders();
   const { products } = useProducts();
+  const [notifPermission, setNotifPermission] = useState(Notification.permission);
+
+  // Active les notifications push
+  usePushNotifications();
 
   const today = new Date().toDateString();
   const todayOrders = orders.filter(o => new Date(o.createdAt).toDateString() === today);
@@ -27,9 +32,51 @@ export default function AdminDashboard() {
 
   const recentOrders = orders.slice(0, 5);
 
+  const enableNotifications = async () => {
+    const permission = await Notification.requestPermission();
+    setNotifPermission(permission);
+  };
+
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold mb-6">Tableau de bord</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-heading text-2xl font-bold">Tableau de bord</h1>
+
+        {/* Bouton activer notifs */}
+        {notifPermission !== 'granted' && (
+          <button
+            onClick={enableNotifications}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-accent text-accent hover:bg-accent hover:text-accent-foreground transition-noor"
+          >
+            <Bell className="h-4 w-4" />
+            Activer les notifications
+          </button>
+        )}
+        {notifPermission === 'granted' && (
+          <div className="flex items-center gap-2 text-xs text-green-600 font-medium">
+            <Bell className="h-4 w-4" />
+            Notifications activées ✓
+          </div>
+        )}
+      </div>
+
+      {/* Bannière si notifs pas activées */}
+      {notifPermission === 'default' && (
+        <div className="bg-accent/10 border border-accent/30 rounded-xl p-4 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Bell className="h-5 w-5 text-accent" />
+            <p className="text-sm font-medium">
+              Activez les notifications pour être alertée dès qu'une nouvelle commande arrive — même si le site est fermé !
+            </p>
+          </div>
+          <button
+            onClick={enableNotifications}
+            className="ml-4 bg-accent text-accent-foreground px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap hover:brightness-110 transition-noor"
+          >
+            Activer
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -50,9 +97,14 @@ export default function AdminDashboard() {
         <div className="bg-card rounded-xl p-4 shadow-warm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-muted-foreground font-medium">En attente</span>
-            <Clock className={`h-4 w-4 ${pendingOrders.length > 5 ? 'text-orange-500' : 'text-muted-foreground'}`} />
+            <Clock className={`h-4 w-4 ${pendingOrders.length > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} />
           </div>
           <p className="font-heading text-2xl font-bold">{pendingOrders.length}</p>
+          {pendingOrders.length > 0 && (
+            <Link to="/admin/commandes" className="text-xs text-accent hover:underline mt-1 block">
+              Voir les commandes →
+            </Link>
+          )}
         </div>
         <div className="bg-card rounded-xl p-4 shadow-warm">
           <div className="flex items-center justify-between mb-2">
@@ -60,6 +112,11 @@ export default function AdminDashboard() {
             <AlertTriangle className={`h-4 w-4 ${outOfStock.length > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
           </div>
           <p className="font-heading text-2xl font-bold">{outOfStock.length}</p>
+          {outOfStock.length > 0 && (
+            <Link to="/admin/stock" className="text-xs text-destructive hover:underline mt-1 block">
+              Gérer le stock →
+            </Link>
+          )}
         </div>
       </div>
 
@@ -108,6 +165,13 @@ export default function AdminDashboard() {
                   </td>
                 </tr>
               ))}
+              {recentOrders.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="py-6 text-center text-muted-foreground text-sm">
+                    Aucune commande pour l'instant
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
